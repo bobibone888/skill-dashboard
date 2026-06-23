@@ -1,7 +1,6 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const chokidar = require('chokidar');
 const { WebSocketServer } = require('ws');
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
@@ -32,16 +31,51 @@ function parseSkillMd(filePath) {
     }
     const bodyStart = fmMatch ? fmMatch[0].length : 0;
     const body = content.slice(bodyStart).trim();
-    const lines = body.split('\n').filter(l => l.trim());
+    const lines = body.split('\n');
+
     const title = lines.find(l => l.startsWith('#'))?.replace(/^#+\s*/, '') || fm.name || path.basename(path.dirname(filePath));
-    // Extract summary: first 5 non-heading non-empty lines
-    const summaryLines = lines.filter(l => !l.startsWith('#')).slice(0, 5);
+
+    // Extract trigger/description/dependencies from body
+    let trigger = '';
+    let description = fm.description || '';
+    let dependencies = '';
+    let sections = [];
+
+    // Try to find trigger keywords
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (/触发|trigger/i.test(l)) {
+        // grab next few lines as trigger info
+        const trigLines = [];
+        for (let j = i; j < Math.min(i + 4, lines.length); j++) {
+          if (lines[j].trim()) trigLines.push(lines[j].replace(/^[#\-*>\s]+/, '').trim());
+        }
+        trigger = trigLines.join(' ').slice(0, 200);
+        break;
+      }
+    }
+
+    // If no description from frontmatter, use first meaningful paragraph
+    if (!description) {
+      const nonHeadingLines = lines.filter(l => l.trim() && !l.startsWith('#') && !l.startsWith('---'));
+      description = nonHeadingLines.slice(0, 3).map(l => l.replace(/^[*\->]+\s*/, '').trim()).join(' ').slice(0, 300);
+    }
+
+    // Extract section headings as overview
+    sections = lines.filter(l => /^#{2,3}\s/.test(l)).map(l => l.replace(/^#+\s*/, '')).slice(0, 10);
+
+    // Dependencies
+    const depLine = lines.find(l => /依赖|depend/i.test(l));
+    if (depLine) dependencies = depLine.replace(/^[#\-*>\s]+/, '').trim().slice(0, 150);
+
     return {
       name: fm.name || title,
-      description: fm.description || '',
       title,
       dir: path.basename(path.dirname(filePath)),
-      summary: summaryLines.join('\n')
+      description,
+      trigger,
+      dependencies,
+      sections
     };
   } catch { return null; }
 }
@@ -81,17 +115,6 @@ function categorize(nameAndDesc) {
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
 
 const server = http.createServer((req, res) => {
-  if (req.url.startsWith('/api/skill/')) {
-    const name = decodeURIComponent(req.url.split('/api/skill/')[1]);
-    let content = '';
-    for (const dir of SKILLS_DIRS) {
-      const p = path.join(dir, name, 'SKILL.md');
-      try { content = fs.readFileSync(p, 'utf-8'); break; } catch {}
-    }
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end(content || 'SKILL.md not found');
-    return;
-  }
   if (req.url === '/api/skills') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     const data = scanSkills().map(s => ({
@@ -106,12 +129,5 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
-for (const dir of SKILLS_DIRS) {
-  if (fs.existsSync(dir)) {
-    chokidar.watch(dir, { depth: 1, ignoreInitial: true, followSymlinks: false }).on('all', () => {
-      wss.clients.forEach(c => c.readyState === 1 && c.send('reload'));
-    });
-  }
-}
 
 server.listen(PORT, () => console.log(`Skill Dashboard: http://localhost:${PORT}\nScanning: ${SKILLS_DIRS.join(', ')}`));
