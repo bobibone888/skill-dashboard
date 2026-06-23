@@ -4,11 +4,19 @@ const path = require('path');
 const chokidar = require('chokidar');
 const { WebSocketServer } = require('ws');
 
-const SKILLS_DIRS = [
-  path.resolve(process.env.HOME || process.env.USERPROFILE, '.claude/skills'),
-  path.resolve(process.env.HOME || process.env.USERPROFILE, '.codex/skills'),
-];
-const PORT = 3456;
+const HOME = process.env.HOME || process.env.USERPROFILE;
+const SKILLS_DIRS = HOME ? [
+  path.resolve(HOME, '.claude/skills'),
+  path.resolve(HOME, '.codex/skills'),
+] : [];
+
+// Allow override via env: SKILLS_DIRS=D:\path1;D:\path2
+if (process.env.SKILLS_DIRS) {
+  SKILLS_DIRS.length = 0;
+  process.env.SKILLS_DIRS.split(';').forEach(d => SKILLS_DIRS.push(d.trim()));
+}
+
+const PORT = process.env.PORT || 3456;
 
 function parseSkillMd(filePath) {
   try {
@@ -38,9 +46,8 @@ function scanSkills() {
     for (const e of entries) {
       if (seen.has(e.name)) continue;
       if (!e.isDirectory() && !e.isSymbolicLink()) continue;
-    // Resolve symlink to check actual target exists
-    const resolved = path.join(dir, e.name);
-    try { fs.statSync(resolved); } catch { continue; }
+      const resolved = path.join(dir, e.name);
+      try { fs.statSync(resolved); } catch { continue; }
       const mdPath = path.join(dir, e.name, 'SKILL.md');
       if (!fs.existsSync(mdPath)) continue;
       seen.add(e.name);
@@ -75,7 +82,6 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-// Watch both dirs
 for (const dir of SKILLS_DIRS) {
   if (fs.existsSync(dir)) {
     chokidar.watch(dir, { depth: 1, ignoreInitial: true, followSymlinks: false }).on('all', () => {
@@ -84,4 +90,4 @@ for (const dir of SKILLS_DIRS) {
   }
 }
 
-server.listen(PORT, () => console.log(`Skill Dashboard: http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Skill Dashboard: http://localhost:${PORT}\nScanning: ${SKILLS_DIRS.join(', ')}`));
