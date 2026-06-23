@@ -14,13 +14,25 @@ body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 .filter-btn { padding: 6px 14px; border-radius: 16px; border: 1px solid #333; background: transparent; color: #aaa; cursor: pointer; font-size: 13px; transition: all .2s; }
 .filter-btn:hover, .filter-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-.card { background: #1a1d27; border: 1px solid #2a2d37; border-radius: 12px; padding: 20px; transition: transform .2s, box-shadow .2s; }
+.card { background: #1a1d27; border: 1px solid #2a2d37; border-radius: 12px; padding: 20px; transition: transform .2s, box-shadow .2s; cursor: pointer; }
 .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
 .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .card-name { font-size: 16px; font-weight: 600; color: #fff; }
 .card-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #2563eb22; color: #60a5fa; }
 .card-desc { font-size: 13px; color: #999; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .card-dir { font-size: 11px; color: #555; margin-top: 10px; font-family: monospace; }
+.card.expanded .card-desc { -webkit-line-clamp: unset; display: block; }
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100; justify-content: center; align-items: center; padding: 32px; }
+.modal-overlay.show { display: flex; }
+.modal { background: #1a1d27; border: 1px solid #2a2d37; border-radius: 16px; max-width: 720px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 32px; position: relative; }
+.modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: #888; font-size: 24px; cursor: pointer; }
+.modal-close:hover { color: #fff; }
+.modal h2 { font-size: 20px; color: #fff; margin-bottom: 8px; }
+.modal .modal-tag { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 10px; background: #2563eb22; color: #60a5fa; margin-bottom: 16px; }
+.modal .modal-desc { font-size: 14px; color: #bbb; line-height: 1.8; margin-bottom: 16px; }
+.modal .modal-content { font-size: 13px; color: #999; line-height: 1.8; white-space: pre-wrap; word-break: break-word; background: #12141c; border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; }
+.modal .modal-path { font-size: 12px; color: #555; margin-top: 12px; font-family: monospace; }
 .toast { position: fixed; top: 16px; right: 16px; background: #22c55e; color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; }
 .toast.show { opacity: 1; }
 </style>
@@ -32,6 +44,16 @@ body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 </div>
 <div class="filters" id="filters"></div>
 <div class="grid" id="grid"></div>
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 id="modalName"></h2>
+    <span class="modal-tag" id="modalTag"></span>
+    <div class="modal-desc" id="modalDesc"></div>
+    <div class="modal-content" id="modalContent"></div>
+    <div class="modal-path" id="modalPath"></div>
+  </div>
+</div>
 <div class="toast" id="toast">Skills updated, reloading...</div>
 
 <script>
@@ -53,21 +75,37 @@ function render() {
     `<button class="filter-btn ${c === activeFilter ? 'active' : ''}" onclick="setFilter('${c}')">${c === 'all' ? '全部' : c}</button>`
   ).join('');
   
-  document.getElementById('grid').innerHTML = filtered.map(s => `
-    <div class="card">
+  document.getElementById('grid').innerHTML = filtered.map((s, i) => `
+    <div class="card" onclick="openModal(${i})">
       <div class="card-header">
         <span class="card-name">${s.name}</span>
         <span class="card-tag">${s.category}</span>
       </div>
       <div class="card-desc">${s.description}</div>
-      <div class="card-dir">~/.claude/skills/${s.dir}/</div>
+      <div class="card-dir">${s.dir}/</div>
     </div>
   `).join('');
 }
 
 function setFilter(f) { activeFilter = f; render(); }
 
-// WebSocket auto-reload
+function openModal(idx) {
+  const s = activeFilter === 'all' ? allSkills[idx] : allSkills.filter(s => s.category === activeFilter)[idx];
+  document.getElementById('modalName').textContent = s.name;
+  document.getElementById('modalTag').textContent = s.category;
+  document.getElementById('modalDesc').textContent = s.description;
+  document.getElementById('modalContent').textContent = s.content || '(loading...)';
+  document.getElementById('modalPath').textContent = s.dir + '/SKILL.md';
+  document.getElementById('modalOverlay').classList.add('show');
+  // Load full content
+  fetch('/api/skill/' + encodeURIComponent(s.dir)).then(r => r.text()).then(t => {
+    document.getElementById('modalContent').textContent = t;
+  });
+}
+
+function closeModal() { document.getElementById('modalOverlay').classList.remove('show'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = () => {
   const t = document.getElementById('toast');

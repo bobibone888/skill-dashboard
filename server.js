@@ -71,6 +71,17 @@ function categorize(desc) {
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
 
 const server = http.createServer((req, res) => {
+  if (req.url.startsWith("/api/skill/")) {
+    const name = decodeURIComponent(req.url.split("/api/skill/")[1]);
+    let content = "";
+    for (const dir of SKILLS_DIRS) {
+      const p = path.join(dir, name, "SKILL.md");
+      try { content = fs.readFileSync(p, "utf-8"); break; } catch {}
+    }
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end(content || "SKILL.md not found");
+    return;
+  }
   if (req.url === '/api/skills') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(scanSkills().map(s => ({ ...s, category: categorize(s.description) }))));
