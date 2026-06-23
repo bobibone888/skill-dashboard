@@ -98,6 +98,7 @@ function openModal(idx) {
   document.getElementById('modalPath').textContent = s.dir + '/SKILL.md';
   document.getElementById('modalOverlay').classList.add('show');
   // Load full content
+  // Full content on demand
   fetch('/api/skill/' + encodeURIComponent(s.dir)).then(r => r.text()).then(t => {
     document.getElementById('modalContent').textContent = t;
   });
