@@ -28,14 +28,14 @@ body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: #888; font-size: 24px; cursor: pointer; }
 .modal-close:hover { color: #fff; }
 .modal h2 { font-size: 20px; color: #fff; margin-bottom: 8px; }
-.modal .mtag { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 10px; background: #2563eb22; color: #60a5fa; margin-bottom: 16px; }
-.msection { margin-bottom: 14px; }
-.msection-title { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; font-weight: 600; }
-.msection-body { font-size: 14px; color: #ccc; line-height: 1.7; }
-.msection-list { list-style: none; padding: 0; columns: 2; column-gap: 16px; }
-.msection-list li { font-size: 12px; color: #aaa; padding: 2px 0; break-inside: avoid; }
-.msection-list li::before { content: "§ "; color: #60a5fa; }
-.modal-path { font-size: 11px; color: #444; margin-top: 16px; font-family: monospace; padding-top: 12px; border-top: 1px solid #222; }
+.modal .modal-tag { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 10px; background: #2563eb22; color: #60a5fa; margin-bottom: 16px; }
+.modal-section { margin-bottom: 16px; }
+.modal-section-title { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.modal-section-body { font-size: 14px; color: #ccc; line-height: 1.7; }
+.modal-sections-list { list-style: none; padding: 0; }
+.modal-sections-list li { font-size: 13px; color: #aaa; padding: 3px 0; border-bottom: 1px solid #222; }
+.modal-sections-list li::before { content: "§ "; color: #60a5fa; }
+.modal-path { font-size: 11px; color: #555; margin-top: 12px; font-family: monospace; }
 </style>
 </head>
 <body>
@@ -46,12 +46,12 @@ body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 <div class="filters" id="filters"></div>
 <div class="grid" id="grid"></div>
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal">
+  <div class="modal" id="modalBody">
     <button class="modal-close" onclick="closeModal()">×</button>
-    <h2 id="mName"></h2>
-    <span class="mtag" id="mTag"></span>
-    <div id="mBody"></div>
-    <div class="modal-path" id="mPath"></div>
+    <h2 id="modalName"></h2>
+    <span class="modal-tag" id="modalTag"></span>
+    <div id="modalContent"></div>
+    <div class="modal-path" id="modalPath"></div>
   </div>
 </div>
 
@@ -62,30 +62,31 @@ let activeFilter = 'all';
 async function load() {
   const res = await fetch('/api/skills');
   allSkills = await res.json();
-  console.log('[dashboard] loaded', allSkills.length, 'skills, sample:', allSkills[0]);
   render();
 }
-
-function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
 function render() {
   const filtered = activeFilter === 'all' ? allSkills : allSkills.filter(s => s.category === activeFilter);
   document.getElementById('stats').textContent = `共 ${allSkills.length} 个 Skills · 当前显示 ${filtered.length} 个`;
+  
   const categories = ['all', ...new Set(allSkills.map(s => s.category))];
-  document.getElementById('filters').innerHTML = categories.map(c =>
+  document.getElementById('filters').innerHTML = categories.map(c => 
     `<button class="filter-btn ${c === activeFilter ? 'active' : ''}" onclick="setFilter('${c}')">${c === 'all' ? '全部' : c}</button>`
   ).join('');
+  
   document.getElementById('grid').innerHTML = filtered.map((s, i) => `
     <div class="card" onclick="openModal(${i})">
       <div class="card-header">
-        <span class="card-name">${esc(s.name)}</span>
-        <span class="card-tag">${esc(s.category)}</span>
+        <span class="card-name">${s.name}</span>
+        <span class="card-tag">${s.category}</span>
       </div>
       <div class="card-desc">${esc(s.description)}</div>
-      <div class="card-dir">${esc(s.dir)}/</div>
+      <div class="card-dir">${s.dir}/</div>
     </div>
   `).join('');
 }
+
+function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 
 function setFilter(f) { activeFilter = f; render(); }
 
@@ -93,30 +94,22 @@ function openModal(idx) {
   const filtered = activeFilter === 'all' ? allSkills : allSkills.filter(s => s.category === activeFilter);
   const s = filtered[idx];
   if (!s) return;
-
-  console.log('[dashboard] openModal', idx, s);
-
-  document.getElementById('mName').textContent = s.name;
-  document.getElementById('mTag').textContent = s.category;
-
+  document.getElementById('modalName').textContent = s.name;
+  document.getElementById('modalTag').textContent = s.category;
+  
   let html = '';
-
-  // 简介 - always show
-  const desc = s.description || s.title || s.name;
-  html += '<div class="msection"><div class="msection-title">简介</div><div class="msection-body">' + esc(desc) + '</div></div>';
-
-  // 触发场景
+  // 简介：用description，没有就用title，再没有就用name
+  const desc = s.description || s.title || s.name || '(未解析到描述)';
+  html += '<div class="modal-section"><div class="modal-section-title">简介</div><div class="modal-section-body">' + esc(desc) + '</div></div>';
   if (s.trigger) {
-    html += '<div class="msection"><div class="msection-title">触发场景</div><div class="msection-body">' + esc(s.trigger) + '</div></div>';
+    html += '<div class="modal-section"><div class="modal-section-title">触发场景</div><div class="modal-section-body">' + esc(s.trigger) + '</div></div>';
   }
-
-  // 文档结构
-  if (s.sections && s.sections.length > 0) {
-    html += '<div class="msection"><div class="msection-title">文档结构</div><ul class="msection-list">' + s.sections.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul></div>';
+  if (s.sections && s.sections.length) {
+    html += '<div class="modal-section"><div class="modal-section-title">文档结构</div><ul class="modal-sections-list">' + s.sections.map(function(t){return '<li>'+esc(t)+'</li>';}).join('') + '</ul></div>';
   }
-
-  document.getElementById('mBody').innerHTML = html;
-  document.getElementById('mPath').textContent = s.dir + '/SKILL.md';
+  
+  document.getElementById('modalContent').innerHTML = html;
+  document.getElementById('modalPath').textContent = s.dir + '/SKILL.md';
   document.getElementById('modalOverlay').classList.add('show');
 }
 
