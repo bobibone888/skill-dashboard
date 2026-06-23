@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skill Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; padding: 32px; }
+.header { text-align: center; margin-bottom: 32px; }
+.header h1 { font-size: 28px; color: #fff; margin-bottom: 8px; }
+.header .stats { font-size: 14px; color: #888; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 24px; }
+.filter-btn { padding: 6px 14px; border-radius: 16px; border: 1px solid #333; background: transparent; color: #aaa; cursor: pointer; font-size: 13px; transition: all .2s; }
+.filter-btn:hover, .filter-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.card { background: #1a1d27; border: 1px solid #2a2d37; border-radius: 12px; padding: 20px; transition: transform .2s, box-shadow .2s; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+.card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.card-name { font-size: 16px; font-weight: 600; color: #fff; }
+.card-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #2563eb22; color: #60a5fa; }
+.card-desc { font-size: 13px; color: #999; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card-dir { font-size: 11px; color: #555; margin-top: 10px; font-family: monospace; }
+.toast { position: fixed; top: 16px; right: 16px; background: #22c55e; color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🧠 Skill Dashboard</h1>
+  <div class="stats" id="stats"></div>
+</div>
+<div class="filters" id="filters"></div>
+<div class="grid" id="grid"></div>
+<div class="toast" id="toast">Skills updated, reloading...</div>
+
+<script>
+let allSkills = [];
+let activeFilter = 'all';
+
+async function load() {
+  const res = await fetch('/api/skills');
+  allSkills = await res.json();
+  render();
+}
+
+function render() {
+  const filtered = activeFilter === 'all' ? allSkills : allSkills.filter(s => s.category === activeFilter);
+  document.getElementById('stats').textContent = `共 ${allSkills.length} 个 Skills · 当前显示 ${filtered.length} 个`;
+  
+  const categories = ['all', ...new Set(allSkills.map(s => s.category))];
+  document.getElementById('filters').innerHTML = categories.map(c => 
+    `<button class="filter-btn ${c === activeFilter ? 'active' : ''}" onclick="setFilter('${c}')">${c === 'all' ? '全部' : c}</button>`
+  ).join('');
+  
+  document.getElementById('grid').innerHTML = filtered.map(s => `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-name">${s.name}</span>
+        <span class="card-tag">${s.category}</span>
+      </div>
+      <div class="card-desc">${s.description}</div>
+      <div class="card-dir">~/.claude/skills/${s.dir}/</div>
+    </div>
+  `).join('');
+}
+
+function setFilter(f) { activeFilter = f; render(); }
+
+// WebSocket auto-reload
+const ws = new WebSocket(`ws://${location.host}`);
+ws.onmessage = () => {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => { t.classList.remove('show'); load(); }, 1000);
+};
+ws.onclose = () => setTimeout(() => location.reload(), 3000);
+
+load();
+</script>
+</body>
+</html>
