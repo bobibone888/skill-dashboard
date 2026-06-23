@@ -105,7 +105,6 @@ function categorize(nameAndDesc) {
   const d = nameAndDesc.toLowerCase();
   if (d.includes('公众号') || d.includes('wechat')) return '公众号';
   if (d.includes('小红书') || d.includes('xhs') || d.includes('xiaohongshu')) return '小红书';
-  if (d.includes('生图') || d.includes('image-gen') || d.includes('mify')) return '生图';
   if (d.includes('漫画') || d.includes('comic')) return '漫画';
   if (d.includes('采集') || d.includes('scrape') || d.includes('爬')) return '采集';
   if (d.includes('debug') || d.includes('android') || d.includes('flutter')) return '开发调试';
