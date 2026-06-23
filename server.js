@@ -21,9 +21,13 @@ function parseSkillMd(filePath) {
     const fm = {};
     const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
     if (fmMatch) {
-      fmMatch[1].split('\n').forEach(line => {
-        const [k, ...v] = line.split(':');
-        if (k && v.length) fm[k.trim()] = v.join(':').trim().replace(/^["']|["']$/g, '');
+      fmMatch[1].split("\n").forEach(line => {
+        const idx = line.indexOf(":");
+        if (idx > 0) {
+          const k = line.slice(0, idx).trim();
+          const val = line.slice(idx + 1).trim().replace(/^["']|["']$/g, "");
+          if (k && val) fm[k] = val;
+        }
       });
     }
     const bodyStart = fmMatch ? fmMatch[0].length : 0;
