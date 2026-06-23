@@ -94,7 +94,6 @@ function openModal(idx) {
   document.getElementById('modalName').textContent = s.name;
   document.getElementById('modalTag').textContent = s.category;
   document.getElementById('modalDesc').textContent = s.description;
-  document.getElementById('modalContent').textContent = s.content || '(loading...)';
   document.getElementById('modalPath').textContent = s.dir + '/SKILL.md';
   document.getElementById('modalOverlay').classList.add('show');
   // Load full content
