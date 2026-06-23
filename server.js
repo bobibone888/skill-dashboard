@@ -5,8 +5,8 @@ const chokidar = require('chokidar');
 const { WebSocketServer } = require('ws');
 
 const SKILLS_DIRS = [
-  path.resolve(process.env.HOME, '.claude/skills'),
-  path.resolve(process.env.HOME, '.codex/skills'),
+  path.resolve(process.env.HOME || process.env.USERPROFILE, '.claude/skills'),
+  path.resolve(process.env.HOME || process.env.USERPROFILE, '.codex/skills'),
 ];
 const PORT = 3456;
 
